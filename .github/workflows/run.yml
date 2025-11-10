@@ -3,43 +3,36 @@ name: Run Bot
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0/20 0-6 * * 1-5"   # 평일 오전장 동안 20분 간격 실행 (원하면 수정 가능)
-    # 예: "*/5 * * * *" → 5분마다 실행
+    - cron: "0 */1 * * *"   # 1시간마다 자동 실행
 
 jobs:
-  run-bot:
+  run:
     runs-on: ubuntu-latest
 
     steps:
-    - name: ✅ 리포지토리 Checkout
-      uses: actions/checkout@v3
+      - name: Checkout Repo
+        uses: actions/checkout@v3
 
-    - name: ✅ Python 설치
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
+      - name: Install Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
 
-    - name: ✅ 의존성 설치
-      run: |
-        pip install --upgrade pip
-        pip install playwright nest_asyncio easyocr python-Levenshtein jamo requests beautifulsoup4 openai pytesseract pandas numpy opencv-python-headless FinanceDataReader
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr libgl1
 
-    - name: ✅ Playwright 브라우저 설치
-      run: |
-        playwright install chromium
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          playwright install chromium
 
-    - name: ✅ OPENAI / Telegram 키 주입
-      env:
-        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      run: |
-        echo "환경변수 설정 완료"
-
-    - name: 🚀 실행
-      env:
-        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      run: |
-        python run.py
+      - name: Run Bot
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python run.py
