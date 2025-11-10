@@ -10,7 +10,7 @@ nest_asyncio.apply()
 # ==============================
 # 🔥 여기 하드코딩 🔥
 # ==============================
-OPENAI_KEY = "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"
+OPENAI_KEY = "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"
 TELEGRAM_BOT = "8583341905:AAF8Ot9f4pLkdoH-evRYIfGX2DBHgpMst_o"
 TELEGRAM_CHAT = "6647068566"
 # ==============================
