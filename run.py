@@ -22,6 +22,9 @@ from playwright.async_api import async_playwright
 import nest_asyncio
 nest_asyncio.apply()
 
+env:
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
 OPENAI_KEY = os.environ.get("OPENAI_API_KEY")
 if not OPENAI_KEY:
     raise Exception("❌ OPENAI_API_KEY 없음 (GitHub Secrets 확인)")
