@@ -1,7 +1,6 @@
 playwright
 nest_asyncio
 easyocr
-finance-datareader
 python-Levenshtein
 jamo
 requests
@@ -11,3 +10,4 @@ pytesseract
 pandas
 numpy
 opencv-python-headless
+FinanceDataReader
