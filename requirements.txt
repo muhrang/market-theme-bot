@@ -1,12 +1,12 @@
 playwright
 nest_asyncio
 easyocr
-FinanceDataReader
 python-Levenshtein
 jamo
-opencv-python
+requests
+beautifulsoup4
+openai
 pytesseract
 pandas
 numpy
-openai
-requests
+opencv-python-headless
