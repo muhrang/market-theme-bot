@@ -1,0 +1,12 @@
+playwright
+nest_asyncio
+easyocr
+FinanceDataReader
+python-Levenshtein
+jamo
+opencv-python
+pytesseract
+pandas
+numpy
+openai
+requests
