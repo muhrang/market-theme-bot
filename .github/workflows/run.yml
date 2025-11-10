@@ -1,16 +1,16 @@
 name: Run Bot
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: "*/15 0-8 * * 1-5"  # 한국시간 시장 시간 동안 15분마다 실행
+    - cron: "0/10 0-6 * * 1-5"   # 평일 장시간 10분 간격 자동실행
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Repository
+    - name: Checkout Repo
       uses: actions/checkout@v3
 
     - name: Set up Python
@@ -18,7 +18,7 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: Install Dependencies
+    - name: Install dependencies
       run: |
         pip install -r requirements.txt
         playwright install chromium
