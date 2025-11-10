@@ -1,34 +1,32 @@
 name: Run Bot
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:   # 수동 실행
   schedule:
-    - cron: "30 0 * * 1-5"   # 평일 한국시간 09:30 자동실행
+    - cron: "0/5 * * * *"   # 5분마다 실행 (원하면 변경 가능)
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout Repo
+        uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Install Python
+        uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
-      - name: System deps
+      - name: Install Dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y tesseract-ocr libgl1 libglib2.0-0
-
-      - name: Install Python deps
-        run: |
-          python -m pip install --upgrade pip
           pip install -r requirements.txt
           playwright install chromium
 
-      - name: Run bot
+      - name: Run Bot
         run: python run.py
