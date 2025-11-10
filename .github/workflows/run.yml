@@ -2,23 +2,35 @@ name: Run Bot
 
 on:
   schedule:
-    - cron: "*/10 * * * *"   # 10분마다 실행
+    - cron: "0/5 0-8 * * 1-5"   # 평일 장중 5분마다 (한국시간 9~15시 기준)
   workflow_dispatch:
 
 jobs:
   run:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install System Dependencies
         run: |
-          pip install -r requirements.txt
-          playwright install chromium
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr tesseract-ocr-kor libgl1
 
-      - name: Run script
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: python run.py
+      - name: Install Python Packages
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install git+https://github.com/FinanceData/FinanceDataReader.git
+          pip install playwright
+          python -m playwright install chromium
+
+      - name: Run Bot (main script)
+        run: |
+          python main.py
