@@ -1,6 +1,7 @@
 playwright
 nest_asyncio
 easyocr
+finance-datareader
 python-Levenshtein
 jamo
 requests
