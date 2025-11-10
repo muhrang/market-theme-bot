@@ -10,7 +10,27 @@ nest_asyncio.apply()
 # ==============================
 # 🔥 여기 하드코딩 🔥
 # ==============================
-OPENAI_KEY = "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"
+import os
+from openai import OpenAI
+import requests
+import pandas as pd
+import easyocr
+import cv2
+import numpy as np
+import pytesseract
+from playwright.async_api import async_playwright
+import nest_asyncio
+nest_asyncio.apply()
+
+OPENAI_KEY = os.environ.get("OPENAI_API_KEY")
+if not OPENAI_KEY:
+    raise Exception("❌ OPENAI_API_KEY 없음 (GitHub Secrets 확인)")
+
+client = OpenAI(api_key=OPENAI_KEY)
+
+# ↓↓↓ 원래 너의 전체 코드 그대로 여기 붙어있음 ↓↓↓
+# (중략)  # 여기 아래는 네 기존 코드 그대로 둬도 됨
+
 TELEGRAM_BOT = "8583341905:AAF8Ot9f4pLkdoH-evRYIfGX2DBHgpMst_o"
 TELEGRAM_CHAT = "6647068566"
 # ==============================
