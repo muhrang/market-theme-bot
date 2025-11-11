@@ -115,3 +115,50 @@ requests.get(f"https://api.telegram.org/bot{TELEGRAM_BOT}/sendMessage",
     params={"chat_id":TELEGRAM_CHAT, "text":msg})
 
 print("✅ 텔레그램 전송 완료")
+
+from telegram.ext import Updater, CommandHandler
+import threading, time
+
+running = False   # 실행 여부 제어 변수
+
+def job_loop():
+    global running
+    while running:
+        print("📡 데이터 수집 & 분석 실행중...")
+        try:
+            asyncio.run(capture())     # 기존 캡처
+            # 아래 기존 분석 + GPT + 텔레그램 보내는 부분 그대로
+        except Exception as e:
+            print("❌ 오류:", e)
+        time.sleep(30)  # 30초마다 반복 (원하면 수정 가능)
+
+def start_cmd(update, context):
+    global running
+    if running:
+        update.message.reply_text("이미 실행중 ✅")
+        return
+    running = True
+    threading.Thread(target=job_loop, daemon=True).start()
+    update.message.reply_text("🚀 자동모드 시작!")
+
+def stop_cmd(update, context):
+    global running
+    running = False
+    update.message.reply_text("⛔ 자동모드 정지!")
+
+def status_cmd(update, context):
+    update.message.reply_text("상태: " + ("실행중 ✅" if running else "정지 ⏸"))
+
+def enable_remote_control():
+    updater = Updater(TELEGRAM_BOT, use_context=True)
+    dp = updater.dispatcher
+    dp.add_handler(CommandHandler("start", start_cmd))
+    dp.add_handler(CommandHandler("stop", stop_cmd))
+    dp.add_handler(CommandHandler("status", status_cmd))
+    updater.start_polling()
+    print("📱 Telegram Remote Control Ready")
+    updater.idle()
+
+if __name__ == "__main__":
+    enable_remote_control()   # 🔥 항상 명령 대기 상태
+
