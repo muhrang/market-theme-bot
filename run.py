@@ -5,6 +5,7 @@ from jamo import h2j
 import Levenshtein
 from openai import OpenAI
 import FinanceDataReader as fdr
+import time
 
 nest_asyncio.apply()
 
@@ -34,29 +35,8 @@ async def capture():
         await page.screenshot(path="after.png", full_page=True)
         await browser.close()
 
-asyncio.run(capture())
-
 # ---- 2) OCR ----
 reader = easyocr.Reader(['ko','en'])
-img = cv2.imread("after.png")
-Y1, Y2 = 230, 2800
-X1, X2 = 100, 430
-Xr1, Xr2 = 1250, 1340
-Xv1, Xv2 = 1700, 1820
-table = img[Y1:Y2]
-
-g = cv2.cvtColor(table, cv2.COLOR_BGR2GRAY)
-edges = cv2.Sobel(g, cv2.CV_16S, 0, 1, ksize=3)
-edges = cv2.convertScaleAbs(edges)
-proj = edges.sum(axis=1)
-smooth = np.convolve(proj, np.ones(13)/13, mode='same')
-thr = np.percentile(smooth, 75)
-cands = np.where(smooth>thr)[0]
-rows=[]; buf=[cands[0]]
-for v in cands[1:]:
-    if v-buf[-1]<=26: buf.append(v)
-    else: rows.append(int(np.mean(buf))); buf=[v]
-rows.append(int(np.mean(buf)))
 
 def fix_rate(t):
     raw = re.sub(r"[^0-9.+-]", "", str(t))
@@ -73,92 +53,84 @@ def best_number(lst):
     nums=[n for n in nums if len(n)>=3]
     return max(nums, key=len) if nums else None
 
-records=[]
-for cy in rows:
-    y1=max(0,cy-26); y2=min(table.shape[0],y1+52)
-    line=table[y1:y2]
-    name_raw = reader.readtext(line[:,X1:X2], detail=0)
-    name=name_raw[0].strip() if name_raw else None
-    rate=fix_rate(pytesseract.image_to_string(cv2.cvtColor(line[:,Xr1:Xr2], cv2.COLOR_BGR2GRAY)))
-    val=best_number(reader.readtext(line[:,Xv1:Xv2], detail=0))
-    if name and val: records.append([name,rate,val])
+def analyze_and_send():
+    img = cv2.imread("after.png")
+    Y1, Y2 = 230, 2800
+    X1, X2 = 100, 430
+    Xr1, Xr2 = 1250, 1340
+    Xv1, Xv2 = 1700, 1820
+    table = img[Y1:Y2]
 
-df=pd.DataFrame(records, columns=["종목명","등락률","거래대금"])
+    g = cv2.cvtColor(table, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Sobel(g, cv2.CV_16S, 0, 1, ksize=3)
+    edges = cv2.convertScaleAbs(edges)
+    proj = edges.sum(axis=1)
+    smooth = np.convolve(proj, np.ones(13)/13, mode='same')
+    thr = np.percentile(smooth, 75)
+    cands = np.where(smooth>thr)[0]
+    rows=[]; buf=[cands[0]]
+    for v in cands[1:]:
+        if v-buf[-1]<=26: buf.append(v)
+        else: rows.append(int(np.mean(buf))); buf=[v]
+    rows.append(int(np.mean(buf)))
 
-# ---- 3) 종목명 보정 / +5% 필터 ----
-names = fdr.StockListing("KRX")["Name"].tolist()
-def correct(n):
-    score=[(s,Levenshtein.distance(h2j(n),h2j(s))) for s in names]
-    score.sort(key=lambda x:x[1])
-    return score[0][0] if score[0][1]<=3 else n
+    records=[]
+    for cy in rows:
+        y1=max(0,cy-26); y2=min(table.shape[0],y1+52)
+        line=table[y1:y2]
+        name_raw = reader.readtext(line[:,X1:X2], detail=0)
+        name=name_raw[0].strip() if name_raw else None
+        rate=fix_rate(pytesseract.image_to_string(cv2.cvtColor(line[:,Xr1:Xr2], cv2.COLOR_BGR2GRAY)))
+        val=best_number(reader.readtext(line[:,Xv1:Xv2], detail=0))
+        if name and val: records.append([name,rate,val])
 
-df["종목명"]=df["종목명"].apply(lambda x:x if x in names else correct(x))
-df=df[~df["종목명"].str.contains("레버|인버|ETF|ETN|선물|KODEX|TIGER")]
-df["거래대금"]=df["거래대금"].astype(int)
-df["등락률_float"]=df["등락률"].str.extract(r'([+-]?\d+\.?\d*)').astype(float)
-df=df.sort_values("거래대금",ascending=False).head(30)
-df=df[df["등락률_float"]>=5].copy()
+    df=pd.DataFrame(records, columns=["종목명","등락률","거래대금"])
 
-# ---- 4) GPT 테마 묶기 ----
-rows=[f"{r['종목명']} | {r['등락률_float']:.2f}% | {int(r['거래대금'])}" for _,r in df.iterrows()]
-prompt="\n".join(rows)
-resp = client.chat.completions.create(
-    model="gpt-4o-mini",
-    messages=[{"role":"user","content":f"테마별로 묶어서 설명해줘:\n{prompt}"}],
-    max_tokens=500
-)
-out=resp.choices[0].message.content
+    # ---- 3) 종목명 보정 / +5% 필터 ----
+    names = fdr.StockListing("KRX")["Name"].tolist()
+    def correct(n):
+        score=[(s,Levenshtein.distance(h2j(n),h2j(s))) for s in names]
+        score.sort(key=lambda x:x[1])
+        return score[0][0] if score[0][1]<=3 else n
 
-# ---- 5) 텔레그램 전송 ----
-msg=f"📈 +5% 강세 종목 테마 분석\n\n{out}"
-requests.get(f"https://api.telegram.org/bot{TELEGRAM_BOT}/sendMessage",
-    params={"chat_id":TELEGRAM_CHAT, "text":msg})
+    df["종목명"]=df["종목명"].apply(lambda x:x if x in names else correct(x))
+    df=df[~df["종목명"].str.contains("레버|인버|ETF|ETN|선물|KODEX|TIGER")]
+    df["거래대금"]=df["거래대금"].astype(int)
+    df["등락률_float"]=df["등락률"].str.extract(r'([+-]?\d+\.?\d*)').astype(float)
+    df=df.sort_values("거래대금",ascending=False).head(30)
+    df=df[df["등락률_float"]>=5].copy()
 
-print("✅ 텔레그램 전송 완료")
+    # ---- 4) GPT 테마 묶기 ----
+    rows_text=[f"{r['종목명']} | {r['등락률_float']:.2f}% | {int(r['거래대금'])}" for _,r in df.iterrows()]
+    prompt="\n".join(rows_text)
+    resp = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role":"user","content":f"테마별로 묶어서 설명해줘:\n{prompt}"}],
+        max_tokens=500
+    )
+    out=resp.choices[0].message.content
 
-from telegram.ext import Updater, CommandHandler
-import threading, time
+    # ---- 5) 텔레그램 전송 ----
+    msg=f"📈 +5% 강세 종목 테마 분석\n\n{out}"
+    requests.get(f"https://api.telegram.org/bot{TELEGRAM_BOT}/sendMessage",
+        params={"chat_id":TELEGRAM_CHAT, "text":msg})
 
-running = False   # 실행 여부 제어 변수
+    print("✅ 텔레그램 전송 완료")
 
-def job_loop():
-    global running
-    while running:
-        print("📡 데이터 수집 & 분석 실행중...")
-        try:
-            asyncio.run(capture())     # 기존 캡처
-            # 아래 기존 분석 + GPT + 텔레그램 보내는 부분 그대로
-        except Exception as e:
-            print("❌ 오류:", e)
-        time.sleep(30)  # 30초마다 반복 (원하면 수정 가능)
+# ---- 6) 최대 6시간 반복 실행 ----
+start_time = time.time()
+max_seconds = 6 * 60 * 60  # 6시간
 
-def start_cmd(update, context):
-    global running
-    if running:
-        update.message.reply_text("이미 실행중 ✅")
-        return
-    running = True
-    threading.Thread(target=job_loop, daemon=True).start()
-    update.message.reply_text("🚀 자동모드 시작!")
+while True:
+    elapsed = time.time() - start_time
+    if elapsed > max_seconds:
+        print("⏹ 6시간 최대 실행 시간 도달, 종료")
+        break
 
-def stop_cmd(update, context):
-    global running
-    running = False
-    update.message.reply_text("⛔ 자동모드 정지!")
+    try:
+        asyncio.run(capture())
+        analyze_and_send()
+    except Exception as e:
+        print("❌ 오류:", e)
 
-def status_cmd(update, context):
-    update.message.reply_text("상태: " + ("실행중 ✅" if running else "정지 ⏸"))
-
-def enable_remote_control():
-    updater = Updater(TELEGRAM_BOT, use_context=True)
-    dp = updater.dispatcher
-    dp.add_handler(CommandHandler("start", start_cmd))
-    dp.add_handler(CommandHandler("stop", stop_cmd))
-    dp.add_handler(CommandHandler("status", status_cmd))
-    updater.start_polling()
-    print("📱 Telegram Remote Control Ready")
-    updater.idle()
-
-if __name__ == "__main__":
-    enable_remote_control()   # 🔥 항상 명령 대기 상태
-
+    time.sleep(30)  # 30초 대기 후 반복
